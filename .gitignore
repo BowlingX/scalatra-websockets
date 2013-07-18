@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 ## generic files to ignore
 *~
 *.lock
@@ -67,3 +68,18 @@ jrebel.lic
 
 # paulp script
 /.lib/
+=======
+*.class
+*.log
+
+# sbt specific
+dist/*
+target/
+lib_managed/
+src_managed/
+project/boot/
+project/plugins/project/
+
+# Scala-IDE specific
+.scala_dependencies
+>>>>>>> 508e3d5d66e592bc6f2ec74f1b587a5fe47f0593
