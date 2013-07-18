@@ -8,9 +8,8 @@ import javax.servlet.http.HttpServletRequest
 import collection.mutable
 import org.scalatra.json.JacksonJsonSupport
 
-trait WebsocketscalatraStack extends ScalatraServlet with ScalateSupport with ApiFormats with JacksonJsonSupport {
+trait WebsocketscalatraStack extends ScalatraServlet with ScalateSupport{
 
-  protected implicit val jsonFormats = org.json4s.DefaultFormats
 
   /* wire up the precompiled templates */
   override protected def defaultTemplatePath: List[String] = List("/WEB-INF/templates/views")

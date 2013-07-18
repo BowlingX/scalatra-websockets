@@ -3,24 +3,25 @@ $(function () {
     var options = { url: location.protocol + "//" + window.location.host + '/at/chat',
         contentType: "application/json",
         logLevel: 'debug',
-        transport: 'websocket',
+        transport: 'long-polling',
         fallbackTransport: 'long-polling',
         onMessage: function (response) {
             var message = response.responseBody;
             try {
-                console.log(message);
+                $("#messages").append(message + "<br>");
             } catch (e) {
                 return false;
             }
 
         } ,
         onOpen: function() {
-
         }
     };
 
-    subsocket = $.atmosphere.subscribe(options);
+    var subsocket = $.atmosphere.subscribe(options);
 
-
+     $("#sendMessage").click(function(){
+         subsocket.push($("#inputMessage").val());
+     });
 
 });

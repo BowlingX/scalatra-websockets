@@ -65,7 +65,7 @@ class HazelcastBroadcaster(id: String, config: AtmosphereConfig)
               def onThrowable(event: AtmosphereResourceEvent) {}
 
               def onBroadcast(event: AtmosphereResourceEvent) {
-                log.info("removing id: %s" format msg.clusterIdent.toString)
+                log.info("removing id (onBroadcast): %s" format msg.clusterIdent.toString)
                 map.remove(msg.clusterIdent)
                 r.removeEventListener(this)
               }
@@ -73,7 +73,7 @@ class HazelcastBroadcaster(id: String, config: AtmosphereConfig)
               def onDisconnect(event: AtmosphereResourceEvent) {}
 
               def onResume(event: AtmosphereResourceEvent) {
-                log.info("removing id: %s" format msg.clusterIdent.toString)
+                log.info("removing id (onResume): %s" format msg.clusterIdent.toString)
 
                 map.remove(msg.clusterIdent)
                 r.removeEventListener(this)
