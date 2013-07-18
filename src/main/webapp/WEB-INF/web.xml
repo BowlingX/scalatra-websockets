@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns="http://java.sun.com/xml/ns/javaee"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://java.sun.com/xml/ns/javaee http://java.sun.com/xml/ns/javaee/web-app_3_0.xsd"
+      version="3.0">
+
+  <!--
+    This listener loads a class in the default package called Scalatra.
+    That class should implement org.scalatra.LifeCycle.  Your app can be
+    configured in Scala code there.
+  -->
+  <listener>
+    <listener-class>org.scalatra.servlet.ScalatraListener</listener-class>
+  </listener>
+
+    <!-- Shiro Security Framework -->
+
+    <listener>
+        <listener-class>org.apache.shiro.web.env.EnvironmentLoaderListener</listener-class>
+    </listener>
+
+    <filter>
+        <filter-name>ShiroFilter</filter-name>
+        <filter-class>org.apache.shiro.web.servlet.ShiroFilter</filter-class>
+        <async-supported>true</async-supported>
+    </filter>
+
+    <filter-mapping>
+        <filter-name>ShiroFilter</filter-name>
+        <url-pattern>/*</url-pattern>
+        <dispatcher>REQUEST</dispatcher>
+        <dispatcher>FORWARD</dispatcher>
+        <dispatcher>INCLUDE</dispatcher>
+        <dispatcher>ERROR</dispatcher>
+    </filter-mapping>
+
+    <!-- Atmosphere Servlet -->
+    <servlet>
+        <description>AtmosphereServlet</description>
+        <servlet-name>AtmosphereServlet</servlet-name>
+        <servlet-class>org.atmosphere.cpr.MeteorServlet</servlet-class>
+        <async-supported>true</async-supported>
+        <!-- see: https://github.com/Atmosphere/atmosphere/wiki/Configuring-Atmosphere-using-the-web.xml-or-atmosphere.xml -->
+        <init-param>
+            <param-name>org.atmosphere.servlet</param-name>
+            <param-value>com.bowlingx.websocket.WebsocketServlet</param-value>
+        </init-param>
+        <init-param>
+            <param-name>org.atmosphere.cpr.broadcaster.shareableThreadPool</param-name>
+            <param-value>true</param-value>
+        </init-param>
+        <init-param>
+            <param-name>org.atmosphere.cpr.broadcasterLifeCyclePolicy</param-name>
+            <param-value>IDLE_DESTROY</param-value>
+        </init-param>
+        <!-- Setup hazelcast as broadcaster -->
+        <init-param>
+            <param-name>org.atmosphere.cpr.broadcasterClass</param-name>
+            <param-value>com.bowlingx.websocket.hazelcast.HazelcastBroadcaster</param-value>
+        </init-param>
+        <!-- see: https://github.com/Atmosphere/atmosphere/wiki/onDisconnect-tricks -->
+        <init-param>
+            <param-name>org.atmosphere.cpr.CometSupport.maxInactiveActivity</param-name>
+            <param-value>50000</param-value>
+        </init-param>
+        <!-- Add Heartbeat to prevent connection loss:
+            see https://github.com/Atmosphere/atmosphere/wiki/Keeping-a-connection-active-using-an-Heartbeat-AtmosphereInterceptor-->
+        <init-param>
+            <param-name>org.atmosphere.cpr.AtmosphereInterceptor</param-name>
+            <param-value>org.atmosphere.interceptor.HeartbeatInterceptor</param-value>
+        </init-param>
+        <load-on-startup>1</load-on-startup>
+    </servlet>
+
+    <servlet-mapping>
+        <servlet-name>AtmosphereServlet</servlet-name>
+        <url-pattern>/at/*</url-pattern>
+    </servlet-mapping>
+
+</web-app>

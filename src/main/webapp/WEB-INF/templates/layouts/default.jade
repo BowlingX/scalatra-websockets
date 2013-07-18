@@ -1,0 +1,15 @@
+-@ val title: String
+-@ val headline: String = title
+-@ val body: String
+
+!!!
+html
+  head
+    title= title
+  body
+    #content
+      h1= headline
+      != body
+      script(src="http://code.jquery.com/jquery-1.10.1.min.js")
+      script(src="/static/js/atmosphere.js")
+      script(src="/static/js/scripts.js")
