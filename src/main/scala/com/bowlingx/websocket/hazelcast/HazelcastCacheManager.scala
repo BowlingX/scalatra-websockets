@@ -24,7 +24,9 @@ class HazelcastCacheManager extends CacheManager with Logging {
 
       def keys() = map.keySet()
 
-      def put(key: K, value: V) = map.put(key, value)
+      def put(key: K, value: V) = {
+        map.put(key, value)
+      }
 
       def remove(key: K) = map.remove(key)
 

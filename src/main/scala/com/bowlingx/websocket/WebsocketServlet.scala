@@ -24,6 +24,7 @@ class WebsocketServlet extends ScalatraServlet with ApiFormats with JacksonJsonS
 
   post("/chat") {
     // just read the message that was pushed und create a new chatMessage
+    log.info(request.body)
     BroadcasterFactory.getDefault.lookup("/at/chat", true).asInstanceOf[Broadcaster]
       .broadcast(ChatMessage(request.body))
     ""

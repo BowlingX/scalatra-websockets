@@ -11,6 +11,7 @@ import org.atmosphere.cpr.Meteor
 import org.atmosphere.cpr.BroadcasterFactory
 import org.atmosphere.cpr.Broadcaster
 import org.apache.shiro.SecurityUtils
+import org.fusesource.scalate.util.Logging
 
 
 object AtmosphereSupport {
@@ -25,7 +26,7 @@ object AtmosphereSupport {
 /**
  * A Simple Atmosphere Support trait that supports catching messages that were send through application
  */
-trait AtmosphereSupport {
+trait AtmosphereSupport extends Logging {
   self: ServletBase with ApiFormats with JacksonJsonSupport =>
 
   import AtmosphereSupport._
@@ -58,11 +59,14 @@ trait AtmosphereSupport {
   private def createFilterForBlock(block:AtmosphereMatch) = {
     new PerRequestBroadcastFilter() {
       def filter(originalMessage: Any, message: Any): BroadcastAction = {
+        log.info("Filter: " + message.toString)
         new org.atmosphere.cpr.BroadcastFilter.BroadcastAction(message)
       }
 
       def filter(r: AtmosphereResource, originalMessage: Any, message: Any): BroadcastAction = {
         // Bind request and response to scope
+        log.info("RequestFilter: " + message.toString + " original: " + originalMessage.toString)
+
         withRequestResponse(r.getRequest, r.getResponse) {
           block.lift.apply(originalMessage).flatMap {
             result =>

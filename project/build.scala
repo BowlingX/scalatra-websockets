@@ -11,7 +11,7 @@ object WebsocketscalatraBuild extends Build {
   val Version = "0.1.0-SNAPSHOT"
   val ScalaVersion = "2.10.2"
   val ScalatraVersion = "2.2.1"
-  val AtmosphereVersion = "2.0.0-SNAPSHOT"
+  val AtmosphereVersion = "2.0.0.RC1"
   val ShiroVersion = "1.2.2"
   val HazelcastVersion = "2.6"
 
@@ -24,7 +24,7 @@ object WebsocketscalatraBuild extends Build {
       version := Version,
       scalaVersion := ScalaVersion,
       resolvers += Classpaths.typesafeReleases,
-      moduleConfigurations += ModuleConfiguration("org.atmosphere", "Sonatype Nexus Snapshots" at "http://oss.sonatype.org/content/repositories/snapshots"),
+      //moduleConfigurations += ModuleConfiguration("org.atmosphere", "Sonatype Nexus Snapshots" at "http://oss.sonatype.org/content/repositories/snapshots"),
       libraryDependencies ++= Seq(
         "org.scalatra" %% "scalatra" % ScalatraVersion,
         "org.scalatra" %% "scalatra-scalate" % ScalatraVersion,

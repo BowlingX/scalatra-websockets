@@ -8,7 +8,7 @@ $(function () {
         onMessage: function (response) {
             var message = response.responseBody;
             try {
-                $("#messages").append(message + "<br>");
+                $("#messages").prepend(message + "<br>");
             } catch (e) {
                 return false;
             }

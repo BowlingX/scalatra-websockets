@@ -130,7 +130,7 @@ class HazelcastBroadcaster(id: String, config: AtmosphereConfig)
       val newMsg = message
       newMsg.msg = filter(newMsg.msg)
       val future = new HazelcastBroadcastFuture(newMsg, this)
-      push(new Entry(newMsg.msg, future, message.msg));
+      push(new Entry(newMsg.msg, future, message.msg))
 
     } catch {
       case e: Exception => log.error("failed to push message: " + message, e)
