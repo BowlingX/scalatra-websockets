@@ -14,11 +14,19 @@ import org.atmosphere.cpr.BroadcastFilter.BroadcastAction
 import org.scalatra.PathPattern
 
 /**
- * This is just a plain servlet
+ * Action Parameters
+ * @param req req
+ * @param resp response
+ * @param routeParams route parameters
+ */
+case class ActionParams(req: HttpServletRequest, resp: HttpServletResponse, routeParams: MultiParams)
+
+/**
+ * This is a simple Servlet that supports Pattern matching style REST urls
+ *
  */
 trait SimpleAtmosphereServlet extends HttpServlet with Logging {
 
-  case class ActionParams(req: HttpServletRequest, resp: HttpServletResponse, routeParams: MultiParams)
 
   type ActionBlock = ActionParams => Any
 
@@ -60,10 +68,11 @@ trait SimpleAtmosphereServlet extends HttpServlet with Logging {
                 (params, action)
             }
         }
-        // If Routes are found, select first route that was found and execute action block
-        val handler = matchingRoutes.head.map {
-          case (params, action) =>
-            action(ActionParams(req, resp, params))
+        // If Routes are found, select first matching route that was found and execute action block
+        val handler = matchingRoutes.filter(_.isDefined).headOption.flatMap {
+          case Some((params, action)) =>
+            Some(action(ActionParams(req, resp, params)))
+          case _ => None
         }
         if (handler.isEmpty) {
           resp.setStatus(HttpStatus.NOT_FOUND_404)
@@ -167,10 +176,15 @@ class PojoServlet extends SimpleAtmosphereServlet {
     case m => Some(m._2)
   }
 
-  post("/at/chat") {
-    a =>
-      val body = Option(a.req.getReader().readLine()).map(_.trim).getOrElse("nothing send...")
+  get("/at/test/:param") { action =>
+   log.info(action.routeParams.get("param").map(_.head).getOrElse("test"))
+  }
+
+  post("/at/chat") { action =>
+      val body = Option(action.req.getReader().readLine()).map(_.trim).getOrElse("nothing send...")
       BroadcasterFactory.getDefault().lookup("/at/chat", true).asInstanceOf[Broadcaster].broadcast(body)
   }
+
+
 
 }
