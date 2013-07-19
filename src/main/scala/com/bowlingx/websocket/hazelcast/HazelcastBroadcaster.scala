@@ -46,7 +46,6 @@ class HazelcastBroadcaster(id: String, config: AtmosphereConfig)
   // A Map to keep track of Topics
   private var uniqueBroadcasterId: Long = _
   private var msgListener: MessageListener[HazelcastMessage[AnyRef]] = _
-  private var broadcastListener:BroadcasterListener = _
 
   def setup() {
     // Subscribe to Topic
@@ -55,48 +54,34 @@ class HazelcastBroadcaster(id: String, config: AtmosphereConfig)
     uniqueBroadcasterId = hazelcast.getIdGenerator(broadcastTopicIdentifier).newId()
     msgListener = new MessageListener[HazelcastMessage[AnyRef]] {
       def onMessage(message: Message[HazelcastMessage[AnyRef]]) {
+        import collection.JavaConversions._
+        getAtmosphereResources foreach {  r =>
+          r.addEventListener(new AtmosphereResourceEventListener() {
+            def onPreSuspend(event:AtmosphereResourceEvent) {}
+
+            def onThrowable(event: AtmosphereResourceEvent) {}
+
+            def onBroadcast(event: AtmosphereResourceEvent) {
+              map.remove(message.getMessageObject.clusterIdent)
+              event.getResource.removeEventListener(this)
+            }
+
+            def onDisconnect(event: AtmosphereResourceEvent) {}
+
+            def onResume(event: AtmosphereResourceEvent) {
+              map.remove(message.getMessageObject.clusterIdent)
+              event.getResource.removeEventListener(this)
+            }
+            def onSuspend(event: AtmosphereResourceEvent) {}
+          })
+
+        }
+
         // Broadcast message to all atmosphere resources
         broadcastReceivedMessage(message.getMessageObject.msg)
       }
     }
     topic.addMessageListener(msgListener)
-
-    broadcastListener = new BroadcasterListener {
-      lazy val resourceListener = new AtmosphereResourceEventListener() {
-
-        def onPreSuspend(event:AtmosphereResourceEvent) {}
-
-        def onThrowable(event: AtmosphereResourceEvent) {}
-
-        def onBroadcast(event: AtmosphereResourceEvent) {
-          map.remove(calcMessageHash(event.getMessage))
-        }
-
-        def onDisconnect(event: AtmosphereResourceEvent) {}
-
-        def onResume(event: AtmosphereResourceEvent) {
-          map.remove(calcMessageHash(event.getMessage))
-        }
-
-        def onSuspend(event: AtmosphereResourceEvent) {}
-      }
-
-      def onPreDestroy(p1: Broadcaster) {}
-
-      def onAddAtmosphereResource(p1: Broadcaster, p2: AtmosphereResource) {
-        p2.addEventListener(resourceListener)
-      }
-
-      def onPostCreate(p1: Broadcaster) {}
-
-      def onComplete(p1: Broadcaster) {}
-
-      def onRemoveAtmosphereResource(p1: Broadcaster, p2: AtmosphereResource) {
-        p2.removeEventListener(resourceListener)
-      }
-    }
-
-    addBroadcasterListener(broadcastListener)
   }
 
   override def setID(id: String) {
@@ -106,7 +91,6 @@ class HazelcastBroadcaster(id: String, config: AtmosphereConfig)
 
   override def destroy() {
     this.synchronized {
-      removeBroadcasterListener(broadcastListener)
       topic.removeMessageListener(msgListener)
       super.destroy()
     }
@@ -159,6 +143,7 @@ class HazelcastBroadcaster(id: String, config: AtmosphereConfig)
  * A Hazelcast Future
  *
  * @param hsl
+ * @param listeners
  * @param b
  * @tparam T
  */
@@ -168,3 +153,5 @@ class HazelcastBroadcastFuture[T]
 
 
 }
+
+

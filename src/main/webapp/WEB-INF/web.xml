@@ -45,23 +45,10 @@
             <param-name>org.atmosphere.servlet</param-name>
             <param-value>com.bowlingx.websocket.PojoServlet</param-value>
         </init-param>
-        <init-param>
-            <param-name>org.atmosphere.cpr.broadcaster.shareableThreadPool</param-name>
-            <param-value>true</param-value>
-        </init-param>
-        <init-param>
-            <param-name>org.atmosphere.cpr.broadcasterLifeCyclePolicy</param-name>
-            <param-value>IDLE_DESTROY</param-value>
-        </init-param>
         <!-- Setup hazelcast as broadcaster -->
         <init-param>
             <param-name>org.atmosphere.cpr.broadcasterClass</param-name>
             <param-value>com.bowlingx.websocket.hazelcast.HazelcastBroadcaster</param-value>
-        </init-param>
-        <!-- see: https://github.com/Atmosphere/atmosphere/wiki/onDisconnect-tricks -->
-        <init-param>
-            <param-name>org.atmosphere.cpr.CometSupport.maxInactiveActivity</param-name>
-            <param-value>50000</param-value>
         </init-param>
         <init-param>
             <param-name>org.atmosphere.cpr.sessionSupport</param-name>
@@ -71,11 +58,7 @@
             see https://github.com/Atmosphere/atmosphere/wiki/Keeping-a-connection-active-using-an-Heartbeat-AtmosphereInterceptor-->
         <init-param>
             <param-name>org.atmosphere.cpr.AtmosphereInterceptor</param-name>
-            <param-value>org.atmosphere.interceptor.HeartbeatInterceptor</param-value>
-        </init-param>
-        <init-param>
-            <param-name>org.atmosphere.cpr.</param-name>
-            <param-value>org.atmosphere.interceptor.HeartbeatInterceptor</param-value>
+            <param-value>org.atmosphere.interceptor.HeartbeatInterceptor, org.atmosphere.interceptor.ShiroInterceptor</param-value>
         </init-param>
         <load-on-startup>1</load-on-startup>
     </servlet>

@@ -21,18 +21,18 @@ import org.scalatra.PathPattern
  */
 case class ActionParams(req: HttpServletRequest, resp: HttpServletResponse, routeParams: MultiParams)
 
+case class RequestParams(req:HttpServletRequest, resp:HttpServletResponse)
 /**
  * This is a simple Servlet that supports Pattern matching style REST urls
  *
  */
 trait SimpleAtmosphereServlet extends HttpServlet with Logging {
 
-
   type ActionBlock = ActionParams => Any
 
-  type AtmosphereMatch = PartialFunction[(ActionParams, Any), Option[Any]]
+  type AtmosphereMatch = PartialFunction[(RequestParams, Any), Option[Any]]
 
-  case class Action(pattern: PathPattern, action: ActionBlock)
+  case class Action(pattern: String, action: ActionBlock)
 
   private[this] val _routes: ConcurrentMap[HttpMethod, Seq[Action]] =
     new ConcurrentHashMap[HttpMethod, Seq[Action]].asScala
@@ -62,7 +62,8 @@ trait SimpleAtmosphereServlet extends HttpServlet with Logging {
       case (t, actionSeq) if t == m =>
         val matchingRoutes = actionSeq map {
           case (Action(pattern, action)) =>
-            val extractedMultiParams = pattern(req.getRequestURI)
+            val calcPattern = "%s%s" format (getServletContext.getContextPath, pattern)
+            val extractedMultiParams = SinatraPathPatternParser(calcPattern)(req.getRequestURI)
             extractedMultiParams map {
               params =>
                 (params, action)
@@ -78,6 +79,9 @@ trait SimpleAtmosphereServlet extends HttpServlet with Logging {
           resp.setStatus(HttpStatus.NOT_FOUND_404)
         } else {
           handler.get match {
+            case s:Int => {
+              resp.setStatus(s)
+            }
             case Unit =>
             case r => {
               resp.getWriter.print(r)
@@ -89,7 +93,7 @@ trait SimpleAtmosphereServlet extends HttpServlet with Logging {
   }
 
   private[this] def addHandler(method: HttpMethod, pattern: String, action: ActionBlock) {
-    val el = Action(SinatraPathPatternParser(pattern), action)
+    val el = Action(pattern, action)
     _routes.put(method, _routes.get(method).map(s => s :+ el).getOrElse(Seq(el)))
   }
 
@@ -118,17 +122,15 @@ trait SimpleAtmosphereServlet extends HttpServlet with Logging {
    * @param block
    * @return
    */
-  private def createFilterForBlock(action: ActionParams, block: AtmosphereMatch) = {
+  private def createFilterForBlock(block: AtmosphereMatch) = {
     new PerRequestBroadcastFilter() {
       def filter(originalMessage: Any, message: Any): BroadcastAction = {
-        log.info("Filter: " + message.toString)
         new org.atmosphere.cpr.BroadcastFilter.BroadcastAction(message)
       }
 
       def filter(r: AtmosphereResource, originalMessage: Any, message: Any): BroadcastAction = {
         // Bind request and response to scope
-        log.info("RequestFilter: " + message.toString + " original: " + originalMessage.toString)
-        block.lift.apply((action, originalMessage)).flatMap {
+        block.lift.apply((RequestParams(r.getRequest, r.getResponse), originalMessage)).flatMap {
           result =>
             result.map(new org.atmosphere.cpr.BroadcastFilter.BroadcastAction(_))
         } getOrElse {
@@ -163,13 +165,16 @@ trait SimpleAtmosphereServlet extends HttpServlet with Logging {
    * @return
    */
   def createMeteor(id: String, action: ActionParams, atmosphereResult: AtmosphereMatch): Meteor = {
+
+    import AtmosphereResource.TRANSPORT._
+
     val m: Meteor = Meteor.build(action.req)
     val b = BroadcasterFactory.getDefault.lookup(id, true).asInstanceOf[Broadcaster]
     b.setScope(Broadcaster.SCOPE.APPLICATION)
     m.setBroadcaster(b)
 
     if (!b.getBroadcasterConfig.hasPerRequestFilters) {
-      b.getBroadcasterConfig.addFilter(createFilterForBlock(action, atmosphereResult))
+      b.getBroadcasterConfig.addFilter(createFilterForBlock(atmosphereResult))
     }
 
     m resumeOnBroadcast (m.transport() == LONG_POLLING)
