@@ -1,46 +1,72 @@
 package com.bowlingx.websocket
 
 import javax.servlet.http.{HttpServletResponse, HttpServletRequest, HttpServlet}
-import org.atmosphere.cpr.{Broadcaster, BroadcasterFactory, Meteor, AtmosphereResourceEventListenerAdapter}
+import org.atmosphere.cpr._
 
 import org.atmosphere.cpr.AtmosphereResource.TRANSPORT._
 import org.scalatra._
 import scala.collection.JavaConverters._
 import java.util.concurrent.ConcurrentHashMap
 import scala.collection.concurrent.{Map => ConcurrentMap}
-import org.scalatra.PathPattern
 import org.eclipse.jetty.http.HttpStatus
 import org.fusesource.scalate.util.Logging
+import org.atmosphere.cpr.BroadcastFilter.BroadcastAction
+import org.scalatra.PathPattern
 
 /**
  * This is just a plain servlet
  */
 trait SimpleAtmosphereServlet extends HttpServlet with Logging {
 
-  type ActionBlock = (HttpServletRequest, HttpServletResponse) => Unit
+  case class ActionParams(req: HttpServletRequest, resp: HttpServletResponse, routeParams: MultiParams)
+
+  type ActionBlock = ActionParams => Any
+
+  type AtmosphereMatch = PartialFunction[(ActionParams, Any), Option[Any]]
 
   case class Action(pattern: PathPattern, action: ActionBlock)
 
   private[this] val _routes: ConcurrentMap[HttpMethod, Seq[Action]] =
     new ConcurrentHashMap[HttpMethod, Seq[Action]].asScala
 
+  /**
+   * Handle all GET Requests
+   */
   override def doGet(req: HttpServletRequest, resp: HttpServletResponse) {
     handle(Get, req, resp)
   }
 
+  /**
+   * Handle all POST Requests
+   */
   override def doPost(req: HttpServletRequest, resp: HttpServletResponse) {
     handle(Post, req, resp)
   }
 
+  /**
+   * Handles Route dispatching
+   * @param m HTTP Method
+   * @param req request
+   * @param resp response
+   */
   private[this] def handle(m: HttpMethod, req: HttpServletRequest, resp: HttpServletResponse) = {
     _routes.foreach {
-      case (t, seq) if t == m =>
-        seq foreach {
-          case (Action(pattern, action)) if pattern(req.getRequestURI).isDefined =>
-            action(req, resp)
-          case _ => {
-            resp.setStatus(HttpStatus.NOT_FOUND_404)
-          }
+      case (t, actionSeq) if t == m =>
+        val matchingRoutes = actionSeq map {
+          case (Action(pattern, action)) =>
+            val extractedMultiParams = pattern(req.getRequestURI)
+            extractedMultiParams map {
+              params =>
+                (params, action)
+            }
+        }
+        // If Routes are found, select first route that was found and execute action block
+        val handler = matchingRoutes.head.map {
+          case (params, action) =>
+            action(ActionParams(req, resp, params))
+        }
+        if (handler.isEmpty) {
+          resp.setStatus(HttpStatus.NOT_FOUND_404)
         }
       case _ =>
     }
@@ -70,17 +96,66 @@ trait SimpleAtmosphereServlet extends HttpServlet with Logging {
     addHandler(Post, pattern, action)
   }
 
+
   /**
-   * Creates a new Meteor with an ID
-   * @param id  id
-   * @param req request
+   * Creates a new Request filter for an atmosphere Result
+   * @param block
    * @return
    */
-  def createMeteor(id: String, req: HttpServletRequest): Meteor = {
-    val m: Meteor = Meteor.build(req)
+  private def createFilterForBlock(action: ActionParams, block: AtmosphereMatch) = {
+    new PerRequestBroadcastFilter() {
+      def filter(originalMessage: Any, message: Any): BroadcastAction = {
+        log.info("Filter: " + message.toString)
+        new org.atmosphere.cpr.BroadcastFilter.BroadcastAction(message)
+      }
+
+      def filter(r: AtmosphereResource, originalMessage: Any, message: Any): BroadcastAction = {
+        // Bind request and response to scope
+        log.info("RequestFilter: " + message.toString + " original: " + originalMessage.toString)
+        block.lift.apply((action, originalMessage)).flatMap {
+          result =>
+            result.map(new org.atmosphere.cpr.BroadcastFilter.BroadcastAction(_))
+        } getOrElse {
+          new org.atmosphere.cpr.BroadcastFilter.BroadcastAction(BroadcastAction.ACTION.ABORT, message)
+        }
+      }
+    }
+  }
+
+
+  /**
+   * Registers an atmosphere Request based on request url
+   * @param pattern pattern to match
+   * @param block atmosphere partial matching
+   * @return
+   */
+  def atmosphere(pattern: String)(block: AtmosphereMatch) = {
+    get(pattern) {
+      a =>
+        val m = createMeteor(a.req.getRequestURI, a, block)
+        m suspend -1
+        Unit
+    }
+
+  }
+
+  /**
+   * Creates a new Meteor
+   * @param id
+   * @param action
+   * @param atmosphereResult
+   * @return
+   */
+  def createMeteor(id: String, action: ActionParams, atmosphereResult: AtmosphereMatch): Meteor = {
+    val m: Meteor = Meteor.build(action.req)
     val b = BroadcasterFactory.getDefault.lookup(id, true).asInstanceOf[Broadcaster]
     b.setScope(Broadcaster.SCOPE.APPLICATION)
     m.setBroadcaster(b)
+
+    if (!b.getBroadcasterConfig.hasPerRequestFilters) {
+      b.getBroadcasterConfig.addFilter(createFilterForBlock(action, atmosphereResult))
+    }
+
     m resumeOnBroadcast (m.transport() == LONG_POLLING)
     m
   }
@@ -88,15 +163,13 @@ trait SimpleAtmosphereServlet extends HttpServlet with Logging {
 
 class PojoServlet extends SimpleAtmosphereServlet {
 
-  get("/at/chat") {
-    (req, resp) =>
-      val m = createMeteor("/at/chat", req)
-      m suspend -1
+  atmosphere("/at/chat") {
+    case m => Some(m._2)
   }
 
   post("/at/chat") {
-    (req, resp) =>
-      val body = Option(req.getReader().readLine()).map(_.trim).getOrElse("nothing send...")
+    a =>
+      val body = Option(a.req.getReader().readLine()).map(_.trim).getOrElse("nothing send...")
       BroadcasterFactory.getDefault().lookup("/at/chat", true).asInstanceOf[Broadcaster].broadcast(body)
   }
 
