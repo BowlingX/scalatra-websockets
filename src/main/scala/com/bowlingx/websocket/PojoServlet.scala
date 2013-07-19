@@ -69,13 +69,20 @@ trait SimpleAtmosphereServlet extends HttpServlet with Logging {
             }
         }
         // If Routes are found, select first matching route that was found and execute action block
-        val handler = matchingRoutes.filter(_.isDefined).headOption.flatMap {
+        val handler = matchingRoutes.find(_.isDefined).flatMap {
           case Some((params, action)) =>
             Some(action(ActionParams(req, resp, params)))
           case _ => None
         }
         if (handler.isEmpty) {
           resp.setStatus(HttpStatus.NOT_FOUND_404)
+        } else {
+          handler.get match {
+            case Unit =>
+            case r => {
+              resp.getWriter.print(r)
+            }
+          }
         }
       case _ =>
     }
@@ -176,15 +183,22 @@ class PojoServlet extends SimpleAtmosphereServlet {
     case m => Some(m._2)
   }
 
-  get("/at/test/:param") { action =>
-   log.info(action.routeParams.get("param").map(_.head).getOrElse("test"))
+  get("/at/test/:param") {
+    action =>
+      log.info(action.routeParams.get("param").map(_.head).getOrElse("test"))
+      <html>
+        <body>
+          <p>Dies ist ein Test</p>
+        </body>
+      </html>
   }
 
-  post("/at/chat") { action =>
+  post("/at/chat") {
+    action =>
       val body = Option(action.req.getReader().readLine()).map(_.trim).getOrElse("nothing send...")
       BroadcasterFactory.getDefault().lookup("/at/chat", true).asInstanceOf[Broadcaster].broadcast(body)
+      Unit
   }
-
 
 
 }

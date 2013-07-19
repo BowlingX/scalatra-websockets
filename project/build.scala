@@ -37,6 +37,7 @@ object WebsocketscalatraBuild extends Build {
         "com.hazelcast" % "hazelcast" % HazelcastVersion,
         "org.apache.shiro" % "shiro-core" % ShiroVersion,
         "org.apache.shiro" % "shiro-web" % ShiroVersion,
+        "commons-io" % "commons-io" % "2.4",
         "ch.qos.logback" % "logback-classic" % "1.0.6" % "runtime",
         "org.eclipse.jetty" % "jetty-webapp" % "8.1.8.v20121106" % "container",
         "org.eclipse.jetty" % "jetty-websocket" % "8.1.8.v20121106",

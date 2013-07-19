@@ -3,8 +3,9 @@ $(function () {
     var options = { url: location.protocol + "//" + window.location.host + '/at/chat',
         contentType: "application/json",
         logLevel: 'debug',
-        transport: 'long-polling',
+        transport: 'websocket',
         fallbackTransport: 'long-polling',
+        maxReconnectOnClose: 200,
         onMessage: function (response) {
             var message = response.responseBody;
             try {

@@ -11,6 +11,8 @@ import com.hazelcast.core.IMap
 import com.hazelcast.core.MessageListener
 import com.hazelcast.core.Message
 import org.fusesource.scalate.util.Logging
+import java.security.MessageDigest
+import java.math.BigInteger
 
 object HazelcastInstance {
   lazy val hazelcast = Hazelcast.newHazelcastInstance(null)
@@ -22,7 +24,7 @@ object HazelcastInstance {
  * @param msg
  * @param clusterIdent
  */
-class HazelcastMessage[T](var msg: T, var clusterIdent: Long) extends Serializable
+class HazelcastMessage[T](var msg: T, var clusterIdent: String) extends Serializable
 
 object HazelcastBroadcaster extends Logging {
 
@@ -40,52 +42,61 @@ class HazelcastBroadcaster(id: String, config: AtmosphereConfig)
 
   private var topic: ITopic[HazelcastMessage[AnyRef]] = _
   // A Map to keep track of Messages
-  lazy val map: IMap[Long, String] = hazelcast.getMap(broadcastTopicIdentifier)
+  lazy val map: IMap[String, String] = hazelcast.getMap(broadcastTopicIdentifier)
   // A Map to keep track of Topics
-  private var uniqueMessageId: Long = _
+  private var uniqueBroadcasterId: Long = _
   private var msgListener: MessageListener[HazelcastMessage[AnyRef]] = _
+  private var broadcastListener:BroadcasterListener = _
 
   def setup() {
     // Subscribe to Topic
     topic = getTopic
     // Generate Cluster wide unique id to track Message
-    uniqueMessageId = hazelcast.getIdGenerator(broadcastTopicIdentifier).newId()
+    uniqueBroadcasterId = hazelcast.getIdGenerator(broadcastTopicIdentifier).newId()
     msgListener = new MessageListener[HazelcastMessage[AnyRef]] {
       def onMessage(message: Message[HazelcastMessage[AnyRef]]) {
-        import scala.collection.JavaConversions._
-        val msg = message.getMessageObject
-        // Get connected Atmosphere Resources for this Broadcaster and remove Delivered Messages from distributed Map
-        log.info(getAtmosphereResources.map(_.uuid()).toList.toString)
-        getAtmosphereResources foreach {
-          r =>
-            r.addEventListener(new AtmosphereResourceEventListener() {
-
-              def onPreSuspend(event: AtmosphereResourceEvent) {}
-
-              def onThrowable(event: AtmosphereResourceEvent) {}
-
-              def onBroadcast(event: AtmosphereResourceEvent) {
-                log.info("removing id (onBroadcast): %s" format msg.clusterIdent.toString)
-                map.remove(msg.clusterIdent)
-                r.removeEventListener(this)
-              }
-
-              def onDisconnect(event: AtmosphereResourceEvent) {}
-
-              def onResume(event: AtmosphereResourceEvent) {
-                log.info("removing id (onResume): %s" format msg.clusterIdent.toString)
-
-                map.remove(msg.clusterIdent)
-                r.removeEventListener(this)
-              }
-
-              def onSuspend(event: AtmosphereResourceEvent) {}
-            })
-        }
-        broadcastReceivedMessage(msg)
+        // Broadcast message to all atmosphere resources
+        broadcastReceivedMessage(message.getMessageObject.msg)
       }
     }
     topic.addMessageListener(msgListener)
+
+    broadcastListener = new BroadcasterListener {
+      lazy val resourceListener = new AtmosphereResourceEventListener() {
+
+        def onPreSuspend(event:AtmosphereResourceEvent) {}
+
+        def onThrowable(event: AtmosphereResourceEvent) {}
+
+        def onBroadcast(event: AtmosphereResourceEvent) {
+          map.remove(calcMessageHash(event.getMessage))
+        }
+
+        def onDisconnect(event: AtmosphereResourceEvent) {}
+
+        def onResume(event: AtmosphereResourceEvent) {
+          map.remove(calcMessageHash(event.getMessage))
+        }
+
+        def onSuspend(event: AtmosphereResourceEvent) {}
+      }
+
+      def onPreDestroy(p1: Broadcaster) {}
+
+      def onAddAtmosphereResource(p1: Broadcaster, p2: AtmosphereResource) {
+        p2.addEventListener(resourceListener)
+      }
+
+      def onPostCreate(p1: Broadcaster) {}
+
+      def onComplete(p1: Broadcaster) {}
+
+      def onRemoveAtmosphereResource(p1: Broadcaster, p2: AtmosphereResource) {
+        p2.removeEventListener(resourceListener)
+      }
+    }
+
+    addBroadcasterListener(broadcastListener)
   }
 
   override def setID(id: String) {
@@ -95,6 +106,7 @@ class HazelcastBroadcaster(id: String, config: AtmosphereConfig)
 
   override def destroy() {
     this.synchronized {
+      removeBroadcasterListener(broadcastListener)
       topic.removeMessageListener(msgListener)
       super.destroy()
     }
@@ -108,17 +120,22 @@ class HazelcastBroadcaster(id: String, config: AtmosphereConfig)
    * If not delete topic, because there are not listeners
    * @return
    */
-  def didReceivedMessage = !map.containsKey(uniqueMessageId)
+  def didReceivedMessage(message:AnyRef) = !map.containsKey(calcMessageHash(message))
 
   def incomingBroadcast() {}
 
+  private def calcMessageHash(message:AnyRef) : String = {
+    val v = "%s@%s" format (uniqueBroadcasterId.toString, message.toString) getBytes "UTF-8"
+    val dig = MessageDigest.getInstance("MD5")
+    dig.update(v, 0, v.length)
+    new BigInteger(1, dig.digest()).toString(16)
+  }
+
   def outgoingBroadcast(message: AnyRef) {
     // Track IDs:
-    log.info("putting msg id: key: %s, value: %s" format(uniqueMessageId.toString, getID))
-    map.put(uniqueMessageId, getID)
-    val hcMessage = new HazelcastMessage[AnyRef](message, uniqueMessageId)
+    map.put(calcMessageHash(message), getID)
+    val hcMessage = new HazelcastMessage[AnyRef](message, calcMessageHash(message))
     topic.publish(hcMessage)
-
   }
 
   /**
@@ -130,7 +147,7 @@ class HazelcastBroadcaster(id: String, config: AtmosphereConfig)
       val newMsg = message
       newMsg.msg = filter(newMsg.msg)
       val future = new HazelcastBroadcastFuture(newMsg, this)
-      push(new Entry(newMsg.msg, future, message.msg))
+      push(new Entry(newMsg.msg,future, message.msg));
 
     } catch {
       case e: Exception => log.error("failed to push message: " + message, e)
@@ -151,5 +168,3 @@ class HazelcastBroadcastFuture[T]
 
 
 }
-
-
