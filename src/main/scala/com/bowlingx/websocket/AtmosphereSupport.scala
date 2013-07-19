@@ -114,7 +114,7 @@ trait AtmosphereSupport extends Logging {
     get(transformers: _*) {
       val m = atmosphereWithId(request.getRequestURI())(block)
       m suspend -1
-      ""
+      Unit
     }
 
   }
