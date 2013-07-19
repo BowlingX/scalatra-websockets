@@ -17,24 +17,18 @@ import org.fusesource.scalate.util.Logging
  */
 trait SimpleAtmosphereServlet extends HttpServlet with Logging {
 
-
   type ActionBlock = (HttpServletRequest, HttpServletResponse) => Unit
 
   case class Action(pattern: PathPattern, action: ActionBlock)
-
-  val broadcastId = "/at/chat"
 
   private[this] val _routes: ConcurrentMap[HttpMethod, Seq[Action]] =
     new ConcurrentHashMap[HttpMethod, Seq[Action]].asScala
 
   override def doGet(req: HttpServletRequest, resp: HttpServletResponse) {
-    log.info("doGet")
     handle(Get, req, resp)
   }
 
   override def doPost(req: HttpServletRequest, resp: HttpServletResponse) {
-    log.info("doPost")
-
     handle(Post, req, resp)
   }
 
@@ -43,10 +37,8 @@ trait SimpleAtmosphereServlet extends HttpServlet with Logging {
       case (t, seq) if t == m =>
         seq foreach {
           case (Action(pattern, action)) if pattern(req.getRequestURI).isDefined =>
-            log.info("calling method: %s" format m.toString)
             action(req, resp)
           case _ => {
-            log.info("always")
             resp.setStatus(HttpStatus.NOT_FOUND_404)
           }
         }
@@ -105,7 +97,7 @@ class PojoServlet extends SimpleAtmosphereServlet {
   post("/at/chat") {
     (req, resp) =>
       val body = Option(req.getReader().readLine()).map(_.trim).getOrElse("nothing send...")
-      BroadcasterFactory.getDefault().lookup(broadcastId, true).asInstanceOf[Broadcaster].broadcast(body)
+      BroadcasterFactory.getDefault().lookup("/at/chat", true).asInstanceOf[Broadcaster].broadcast(body)
   }
 
 }
