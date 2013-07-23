@@ -12,6 +12,7 @@ import org.eclipse.jetty.http.HttpStatus
 import org.fusesource.scalate.util.Logging
 import org.atmosphere.cpr.BroadcastFilter.BroadcastAction
 import org.scalatra.PathPattern
+import scala.util.{Failure, Success, Try}
 
 /**
  * Action Parameters
@@ -57,12 +58,12 @@ trait SimpleAtmosphereServlet extends HttpServlet with Logging {
    * @param req request
    * @param resp response
    */
-  private[this] def handle(m: HttpMethod, req: HttpServletRequest, resp: HttpServletResponse) = {
+  private[this] def handle(m: HttpMethod, req: HttpServletRequest, resp: HttpServletResponse) {
     _routes.foreach {
       case (t, actionSeq) if t == m =>
         val matchingRoutes = actionSeq map {
           case (Action(pattern, action)) =>
-            val calcPattern = "%s%s" format (getServletContext.getContextPath, pattern)
+            val calcPattern = "%s%s" format(getServletContext.getContextPath, pattern)
             val extractedMultiParams = SinatraPathPatternParser(calcPattern)(req.getRequestURI)
             extractedMultiParams map {
               params =>
@@ -70,24 +71,33 @@ trait SimpleAtmosphereServlet extends HttpServlet with Logging {
             }
         }
         // If Routes are found, select first matching route that was found and execute action block
-        val handler = matchingRoutes.find(_.isDefined).flatMap {
-          case Some((params, action)) =>
-            Some(action(ActionParams(req, resp, params)))
-          case _ => None
-        }
-        if (handler.isEmpty) {
-          resp.setStatus(HttpStatus.NOT_FOUND_404)
-        } else {
-          handler.get match {
-            case s:Int => {
-              resp.setStatus(s)
-            }
-            case Unit =>
-            case r => {
-              resp.getWriter.print(r)
+        val respOpt = matchingRoutes.find(_.isDefined) map {
+          case Some((params, action)) => {
+            Try(action(ActionParams(req, resp, params))) match {
+              case Success(r) => r match {
+                case s: Int => {
+                  resp.setStatus(s)
+                }
+                case Unit =>
+                case r => {
+                  // Explicitly set encoding and content type
+                  resp.setCharacterEncoding("UTF-8")
+                  resp.setContentType("application/json")
+                  resp.getWriter.print(r)
+                }
+              }
+              case Failure(error) => {
+                log.error("Fatal error during servlet processing: %s" format error.getMessage, error)
+                resp.setStatus(HttpStatus.INTERNAL_SERVER_ERROR_500)
+              }
             }
           }
+          case _ => Unit
+        } orElse {
+          resp.setStatus(HttpStatus.NOT_FOUND_404)
+          None
         }
+
       case _ =>
     }
   }

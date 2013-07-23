@@ -11,7 +11,7 @@ object WebsocketscalatraBuild extends Build {
   val Version = "0.1.0-SNAPSHOT"
   val ScalaVersion = "2.10.2"
   val ScalatraVersion = "2.2.1"
-  val AtmosphereVersion = "2.0.0.RC1"
+  val AtmosphereVersion = "2.0.0-SNAPSHOT"
   val ShiroVersion = "1.2.2"
   val HazelcastVersion = "2.6"
 
@@ -44,7 +44,8 @@ object WebsocketscalatraBuild extends Build {
 
         "org.eclipse.jetty.orbit" % "javax.servlet" % "3.0.0.v201112011016" % "container;provided;test" artifacts (Artifact("javax.servlet", "jar", "jar"))
       ),
-      scalateTemplateConfig in Compile <<= (sourceDirectory in Compile) {
+        moduleConfigurations += ModuleConfiguration("org.atmosphere", "Sonatype Nexus Snapshots" at "http://oss.sonatype.org/content/repositories/snapshots"),
+        scalateTemplateConfig in Compile <<= (sourceDirectory in Compile) {
         base =>
           Seq(
             TemplateConfig(
