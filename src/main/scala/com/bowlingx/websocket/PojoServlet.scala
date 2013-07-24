@@ -13,6 +13,8 @@ import org.fusesource.scalate.util.Logging
 import org.atmosphere.cpr.BroadcastFilter.BroadcastAction
 import org.scalatra.PathPattern
 import scala.util.{Failure, Success, Try}
+import org.apache.shiro.SecurityUtils
+import org.apache.shiro.subject.Subject
 
 /**
  * Action Parameters
@@ -195,11 +197,15 @@ trait SimpleAtmosphereServlet extends HttpServlet with Logging {
 class PojoServlet extends SimpleAtmosphereServlet {
 
   atmosphere("/at/chat") {
-    case m => Some(m._2)
+    case (RequestParams(req, resp), message) => {
+      log.info(Option(req.getAttribute("subject")).map(_.asInstanceOf[Subject].getPrincipal.toString).getOrElse("unkown request principal"))
+      Some(message)
+    }
   }
 
   get("/at/test/:param") {
     action =>
+      log.info(Option(SecurityUtils.getSubject).map(_.getPrincipal.toString).getOrElse("unkown principal"))
       log.info(action.routeParams.get("param").map(_.head).getOrElse("test"))
       <html>
         <body>
